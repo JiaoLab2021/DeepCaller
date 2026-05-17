@@ -108,7 +108,7 @@ DeepCaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `-s`, `--species` | auto | 物种模型 — `--ploidy 4` 时默认 `potato`，`--ploidy 6` 时默认 `sweetpotato` |
+| `-s`, `--species` | auto | 物种模型 |
 | `-m`, `--mode` | `speed` | 推理模式：`speed`（速度优先）或 `performance`（性能优先） |
 | `-t`, `--cpus` | `24` | CPU 线程数；`-1` 表示使用全部可用线程 |
 | `--min_af` | `0.10` | 候选位点最小等位基因频率 |

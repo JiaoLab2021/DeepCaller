@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/平台-linux-lightgrey" alt="平台">
 </p>
 
-**DeepCaller** 是一款基于深度学习的变异检测工具，专为多倍体基因组短读长测序数据中 SNP 和小片段 Indel 的精准检测而设计。它提供了五个针对四倍体和六倍体作物的预训练模型，并支持速度优先和性能优先两种推理模式。英文教程请参见 [English README](../README.md)。
+**DeepCaller** 是一款基于深度学习的变异检测工具，专为多倍体基因组短读长数据中 SNP 和小片段 Indel 的精准检测而设计。它提供了五个针对四倍体和六倍体作物的预训练模型，并支持速度优先和性能优先两种推理模式。英文教程请参见 [English README](../README.md)。
 
 > **注意**：本仓库配套论文目前正在审稿中，软件的完整使用权将在论文正式发表后开放。详情请参见 [LICENSE](../LICENSE)。
 
@@ -43,7 +43,6 @@ DeepCaller 的工作流程包含四个顺序步骤。**步骤一：** 对输入 
 
 - Linux (x86_64)
 - [Conda](https://docs.conda.io/en/latest/miniconda.html) ≥ 4.10
-- samtools、mosdepth、bgzip、tabix（通过 conda 环境自动安装）
 
 ### 安装步骤
 
@@ -102,7 +101,7 @@ DeepCaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 |------|--------|------|
 | `-o`, `--output` | `output.vcf` | 输出 VCF 文件（将进行 bgzip 压缩） |
 | `-c`, `--chroms` | 全部 | 指定处理的染色体 |
-| `-l`, `--bed` | — | BED 文件，将变异检测限定于目标区域；设置后覆盖 `--chroms` |
+| `--bed` | — | BED 文件，将变异检测限定于目标区域；设置后覆盖 `--chroms` |
 
 ### 处理选项
 
@@ -125,7 +124,7 @@ DeepCaller -r ref.fa -b sample.bam -p 4 --mode performance -o out.vcf -t 24
 DeepCaller -r ref.fa -b sample.bam -p 6 -c chr1 chr2 chr3 -o out.vcf
 
 # 苜蓿，仅分析目标区域（BED 文件）
-DeepCaller -r ref.fa -b sample.bam -p 4 --species alfalfa -l targets.bed -o out.vcf
+DeepCaller -r ref.fa -b sample.bam -p 4 --species alfalfa --bed targets.bed -o out.vcf
 ```
 
 ---

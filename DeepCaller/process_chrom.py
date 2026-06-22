@@ -1,6 +1,7 @@
 import re
 import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import h5py
@@ -17,7 +18,6 @@ from multiprocessing import Pool
 from .utils import BedIndex, ref_encoding_dict
 
 
-# Species → model folder name (must match main.py SPECIES_MAP)
 SPECIES_MAP = {
     'potato':       '01_C88_Potato_default',
     'alfalfa':      '02_Bolivia_Alfalfa',
@@ -26,7 +26,6 @@ SPECIES_MAP = {
     'syn_potato':   '05_SyntheticPotato_Potato',
 }
 
-# Mode → model subfolder prefix
 MODE_PREFIX = {
     'speed':       '01_speed_model',
     'performance': '02_performance_mode',
@@ -34,11 +33,6 @@ MODE_PREFIX = {
 
 
 def resolve_model_dir(species, mode):
-    """
-    Locate the model subdirectory for a given species and mode.
-    Folder names follow the pattern: {prefix}_w={n}
-    Returns (model_subdir_path, win_size).
-    """
     current_file_dir = os.path.dirname(os.path.abspath(__file__))
     project_root     = os.path.dirname(current_file_dir)
     species_dir      = os.path.join(project_root, "models", SPECIES_MAP[species])
@@ -79,17 +73,10 @@ def pileup_window_encoding(
     win_size,
     bam_depth,
 ):
-    """
-    Encode a window of pileup information into a flat numerical array,
-    split by strand direction and sequence features.
-    """
-
     def encode_strand(seq_lst, names_lst, mq_lst, strand_dict, strand_type):
 
         strand_value = 1 if strand_type == 'pos' else 0
-
-        mask = [strand_dict.get(name, True) == strand_value for name in names_lst]
-
+        mask         = [strand_dict.get(name, True) == strand_value for name in names_lst]
         filtered_seqs = [seq for seq, m in zip(seq_lst, mask) if m]
         mq_lst_       = [mq  for mq,  m in zip(mq_lst,  mask) if m]
 
@@ -104,17 +91,19 @@ def pileup_window_encoding(
 
         base_count = [snp_lst.count(base) for base in 'ACGT']
 
-        IS1 = pd.Series(ins_lst).value_counts().max() if ins_lst else 0
-        IL1 = (
-            int(re.match(r'^\d+', pd.Series(ins_lst).mode().iloc[0]).group(0))
-            if ins_lst else 0
-        )
+        if ins_lst:
+            ins_vals, ins_counts = np.unique(ins_lst, return_counts=True)
+            IS1  = int(ins_counts.max())
+            IL1  = int(re.match(r'^\d+', ins_vals[ins_counts.argmax()]).group(0))
+        else:
+            IS1, IL1 = 0, 0
 
-        DS1 = pd.Series(del_lst).value_counts().max() if del_lst else 0
-        DL1 = (
-            int(re.match(r'^\d+', pd.Series(del_lst).mode().iloc[0]).group(0))
-            if del_lst else 0
-        )
+        if del_lst:
+            del_vals, del_counts = np.unique(del_lst, return_counts=True)
+            DS1  = int(del_counts.max())
+            DL1  = int(re.match(r'^\d+', del_vals[del_counts.argmax()]).group(0))
+        else:
+            DS1, DL1 = 0, 0
 
         DR = filtered_seqs.count('*')
 
@@ -139,16 +128,9 @@ def pileup_window_encoding(
     results = []
 
     for i in range(1, win_size * 2 + 2):
-
         ref_encoding = [ref_encoding_dict.get(ref_window[i], 4)]
-
-        pos_features = encode_strand(
-            seq_window[i], name_window[i], mq_window[i], strand_dict, 'pos'
-        )
-        neg_features = encode_strand(
-            seq_window[i], name_window[i], mq_window[i], strand_dict, 'neg'
-        )
-
+        pos_features = encode_strand(seq_window[i], name_window[i], mq_window[i], strand_dict, 'pos')
+        neg_features = encode_strand(seq_window[i], name_window[i], mq_window[i], strand_dict, 'neg')
         results.append([bam_depth] + ref_encoding + pos_features + neg_features)
 
     return np.array(results, dtype=np.float32).flatten()
@@ -159,7 +141,7 @@ def select_encode_test(chrom, start, end, dct):
     fasta_path = dct['fasta_path']
     bam_path   = dct['bam_path']
     bed_path   = dct['bed_path']
-    min_af    = dct['min_af']
+    min_af     = dct['min_af']
     win_size   = dct['win_size']
     rd_floor   = dct['rd_floor']
     bam_depth  = dct['bam_depth']
@@ -229,40 +211,58 @@ def select_encode_test(chrom, start, end, dct):
         if bed_path and not bed_idx.contains(chrom, v_pos):
             continue
 
-        snp_lst = [
-            s[0].upper() for s in seq_lst if s != '*' and s[0].upper() != v_ref
-        ]
+        snp_lst = [s[0].upper() for s in seq_lst if s != '*' and s[0].upper() != v_ref]
         ins_lst = [s.split('+')[1].upper() for s in seq_lst if '+' in s]
         del_lst = [s.split('-')[1].upper() for s in seq_lst if '-' in s]
 
-        snp_num = pd.Series(snp_lst).value_counts().max() if snp_lst else 0
-        ins_num = pd.Series(ins_lst).value_counts().max() if ins_lst else 0
-        del_num = pd.Series(del_lst).value_counts().max() if del_lst else 0
+        if snp_lst:
+            _, snp_counts = np.unique(snp_lst, return_counts=True)
+            snp_num = int(snp_counts.max())
+        else:
+            snp_num = 0
 
-        alt_num  = max([snp_num, ins_num, del_num, 0])
+        if ins_lst:
+            _, ins_counts = np.unique(ins_lst, return_counts=True)
+            ins_num = int(ins_counts.max())
+        else:
+            ins_num = 0
+
+        if del_lst:
+            _, del_counts = np.unique(del_lst, return_counts=True)
+            del_num = int(del_counts.max())
+        else:
+            del_num = 0
+
+        alt_num  = max(snp_num, ins_num, del_num, 0)
         alt_freq = alt_num / v_rd
 
         if alt_freq < min_af:
             continue
 
         if snp_num >= ins_num and snp_num >= del_num:
-            snp_element = pd.Series(snp_lst).mode().iloc[0] if snp_lst else None
+            if snp_lst:
+                snp_vals, snp_counts = np.unique(snp_lst, return_counts=True)
+                snp_element = snp_vals[snp_counts.argmax()]
+            else:
+                snp_element = None
             ref, alt = v_ref, snp_element
 
         elif ins_num >= snp_num and ins_num >= del_num:
-            ins_element = (
-                re.sub(r'^\d+', '', pd.Series(ins_lst).mode().iloc[0])
-                if ins_lst else None
-            )
+            if ins_lst:
+                ins_vals, ins_counts = np.unique(ins_lst, return_counts=True)
+                ins_element = re.sub(r'^\d+', '', ins_vals[ins_counts.argmax()])
+            else:
+                ins_element = None
             if len(ins_element) > max_id_len:
                 continue
             ref, alt = v_ref, v_ref + ins_element
 
         else:
-            del_length = (
-                int(re.match(r'^\d+', pd.Series(del_lst).mode().iloc[0]).group(0))
-                if del_lst else 0
-            )
+            if del_lst:
+                del_vals, del_counts = np.unique(del_lst, return_counts=True)
+                del_length = int(re.match(r'^\d+', del_vals[del_counts.argmax()]).group(0))
+            else:
+                del_length = 0
             if del_length > max_id_len:
                 continue
             ref = ''.join(
@@ -301,15 +301,14 @@ def select_encode_test(chrom, start, end, dct):
 
 def process_chromosomes(dct):
 
-    chrom         = dct['chrom']
-    num_threads   = dct['num_threads']
-    feature_dim   = dct['feature_dim']
-    batch_size    = dct['batch_size']
-    win_size      = dct['win_size']
-    gpu_available = dct['gpu_available']
-    model_path    = dct['model_path']
-    stat_path     = dct['stat_path']
-    work_dir      = dct['work_dir']
+    chrom       = dct['chrom']
+    num_threads = dct['num_threads']
+    feature_dim = dct['feature_dim']
+    batch_size  = dct['batch_size']
+    win_size    = dct['win_size']
+    model_path  = dct['model_path']
+    stat_path   = dct['stat_path']
+    work_dir    = dct['work_dir']
 
     seq_len = 2 * win_size + 1
 
@@ -329,7 +328,7 @@ def process_chromosomes(dct):
     print(f"[INFO] Encoding chromosome: {chrom}")
 
     chrom_len  = fasta_file.get_reference_length(chrom)
-    chunk_size = chrom_len // num_threads
+    chunk_size = chrom_len // (num_threads * 2)
 
     chunks = [
         (chrom, start, min(start + chunk_size - 1, chrom_len), dct)
@@ -339,14 +338,17 @@ def process_chromosomes(dct):
     chunks[-2] = (chrom, chunks[-2][1], chunks[-1][2], dct)
     chunks.pop()
 
-    all_enc = []
-    all_df  = pd.DataFrame()
-
     with Pool(processes=num_threads) as pool:
-        for sub_enc, sub_df in pool.starmap(select_encode_test, chunks):
-            all_enc.extend(sub_enc)
-            sub_df = sub_df.dropna(axis=1, how='all')
-            all_df = pd.concat([all_df, sub_df], axis=0, ignore_index=True)
+        results = pool.starmap(select_encode_test, chunks)
+
+    all_enc = []
+    dfs     = []
+    for sub_enc, sub_df in results:
+        all_enc.extend(sub_enc)
+        sub_df = sub_df.dropna(axis=1, how='all')
+        dfs.append(sub_df)
+
+    all_df = pd.concat(dfs, ignore_index=True)
 
     X_test  = np.array(all_enc)
     X_test -= mean
@@ -356,11 +358,9 @@ def process_chromosomes(dct):
     del all_enc
     ctypes.CDLL("libc.so.6").malloc_trim(0)
 
-    device  = "/GPU:0" if gpu_available else "/CPU:0"
     y_preds = []
-
-    with tf.device(device):
-        print(f"[INFO] Running inference on {'GPU' if gpu_available else 'CPU'}...")
+    with tf.device('/CPU:0'):
+        print(f"[INFO] Running inference on CPU...")
         for i in range(0, len(X_test), batch_size):
             y_preds.append(model.predict_on_batch(X_test[i:i + batch_size]))
 
@@ -381,54 +381,45 @@ def main():
     parser = argparse.ArgumentParser()
     required = parser.add_argument_group('Required arguments')
 
-    required.add_argument("--ref",           type=str,   required=True)
-    required.add_argument("--bam",           type=str,   required=True)
-    required.add_argument("--bed",           type=str,   default=None)
-    required.add_argument("--chrom",         type=str,   required=True)
-    required.add_argument("--ploidy",        type=int,   required=True)
-    required.add_argument("--cpus",          type=int,   required=True)
-    required.add_argument("--bam_depth",     type=int,   required=True)
-    required.add_argument("--species",       type=str,   required=True)
-    required.add_argument("--mode",          type=str,   required=True)
-    required.add_argument("--min_af",        type=float, required=True)
-    required.add_argument("--rd_floor",      type=int,   required=True)
-    required.add_argument("--gpu_available",             required=True)
-    required.add_argument("--work_dir",      type=str,   required=True)
+    required.add_argument("--ref",       type=str,   required=True)
+    required.add_argument("--bam",       type=str,   required=True)
+    required.add_argument("--bed",       type=str,   default=None)
+    required.add_argument("--chrom",     type=str,   required=True)
+    required.add_argument("--ploidy",    type=int,   required=True)
+    required.add_argument("--cpus",      type=int,   required=True)
+    required.add_argument("--bam_depth", type=int,   required=True)
+    required.add_argument("--species",   type=str,   required=True)
+    required.add_argument("--mode",      type=str,   required=True)
+    required.add_argument("--min_af",    type=float, required=True)
+    required.add_argument("--rd_floor",  type=int,   required=True)
+    required.add_argument("--work_dir",  type=str,   required=True)
 
     args = parser.parse_args()
 
-    gpus = tf.config.list_physical_devices('GPU')
-
-    if args.gpu_available.lower() == "true":
-        if gpus:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-    else:
-        tf.config.set_visible_devices([], 'GPU')
+    tf.config.set_visible_devices([], 'GPU')
 
     model_path, win_size = resolve_model_dir(args.species, args.mode)
     stat_path            = os.path.join(model_path, "statistics.h5")
     model_path           = os.path.join(model_path, "model")
 
     dct = {
-        'fasta_path'    : args.ref,
-        'bam_path'      : args.bam,
-        'bed_path'      : args.bed,
-        'chrom'         : args.chrom,
-        'ploidy'        : args.ploidy,
-        'num_threads'   : args.cpus,
-        'bam_depth'     : args.bam_depth,
-        'win_size'      : win_size,
-        'min_af'       : args.min_af,
-        'rd_floor'      : args.rd_floor,
-        'rd_divisor'    : args.ploidy,
-        'gpu_available' : args.gpu_available.lower() == "true",
-        'model_path'    : model_path,
-        'stat_path'     : stat_path,
-        'work_dir'      : args.work_dir,
-        'batch_size'    : 8192,
-        'feature_dim'   : 30,
-        'max_id_len'    : 20,
+        'fasta_path'  : args.ref,
+        'bam_path'    : args.bam,
+        'bed_path'    : args.bed,
+        'chrom'       : args.chrom,
+        'ploidy'      : args.ploidy,
+        'num_threads' : args.cpus,
+        'bam_depth'   : args.bam_depth,
+        'win_size'    : win_size,
+        'min_af'      : args.min_af,
+        'rd_floor'    : args.rd_floor,
+        'rd_divisor'  : args.ploidy,
+        'model_path'  : model_path,
+        'stat_path'   : stat_path,
+        'work_dir'    : args.work_dir,
+        'batch_size'  : 8192,
+        'feature_dim' : 30,
+        'max_id_len'  : 20,
     }
 
     process_chromosomes(dct)

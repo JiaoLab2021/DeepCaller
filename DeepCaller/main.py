@@ -3,6 +3,7 @@ import os
 import sys
 import uuid
 
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 from setproctitle import setproctitle
@@ -30,7 +31,6 @@ from .utils_vcf import generate_vcf
 from DeepCaller import __version__
 
 
-# Species → (model folder name, supported ploidy levels)
 SPECIES_MAP = {
     'potato':       ('01_C88_Potato_default',            [4]),
     'alfalfa':      ('02_Bolivia_Alfalfa',               [4]),
@@ -39,17 +39,13 @@ SPECIES_MAP = {
     'syn_potato':   ('05_SyntheticPotato_Potato',        [6]),
 }
 
-# Default species for each ploidy level
 PLOIDY_DEFAULT_SPECIES = {
     4: 'potato',
     6: 'sweetpotato',
 }
 
 
-def check_hardware(requested_cpus=None, use_gpu=True):
-    """
-    Check and configure hardware resources including TensorFlow settings.
-    """
+def check_hardware(requested_cpus=None):
     available_cpus = multiprocessing.cpu_count()
 
     if requested_cpus is None:
@@ -65,27 +61,13 @@ def check_hardware(requested_cpus=None, use_gpu=True):
         used_cpus = requested_cpus
         print(f"* Use CPU threads: {used_cpus}/{available_cpus}")
 
-    gpus = tf.config.list_physical_devices('GPU')
-    gpu_available = bool(gpus) and use_gpu
-
+    tf.config.set_visible_devices([], 'GPU')
     tf.config.threading.set_intra_op_parallelism_threads(used_cpus)
     tf.config.threading.set_inter_op_parallelism_threads(used_cpus)
 
-    if gpu_available:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"* GPU acceleration enabled: {len(gpus)} GPU device(s) detected")
-    else:
-        tf.config.set_visible_devices([], 'GPU')
-        if use_gpu:
-            if gpus:
-                print("[WARNING] GPU devices detected but disabled by configuration")
-            else:
-                print("* No GPU devices detected, using CPU only")
-        else:
-            print("* GPU acceleration disabled by user, using CPU only")
+    print(f"* Running on CPU only")
 
-    return used_cpus, gpu_available
+    return used_cpus
 
 
 def cpu_count_type(value):
@@ -110,32 +92,14 @@ def main():
     )
 
     required = parser.add_argument_group('Required arguments')
-    required.add_argument("-r", "--ref", required=True, help="Reference FASTA file")
-    required.add_argument("-b", "--bam", required=True, help="Input BAM file")
-    required.add_argument(
-        "-p", "--ploidy",
-        required=True,
-        type=int,
-        choices=[4, 6],
-        help="Ploidy level",
-    )
+    required.add_argument("-r", "--ref",    required=True, help="Reference FASTA file")
+    required.add_argument("-b", "--bam",    required=True, help="Input BAM file")
+    required.add_argument("-p", "--ploidy", required=True, type=int, choices=[4, 6], help="Ploidy level")
 
     io_group = parser.add_argument_group('Input/output configuration')
-    io_group.add_argument(
-        "-c", "--chroms",
-        nargs="+",
-        help="Chromosomes to include",
-    )
-    io_group.add_argument(
-        "-o", "--output",
-        default="output.vcf",
-        help="Output VCF file",
-    )
-    io_group.add_argument(
-        "-l", "--bed",
-        default=None,
-        help="Optional BED file. If provided, --chroms will be ignored",
-    )
+    io_group.add_argument("-c", "--chroms", nargs="+",        help="Chromosomes to include")
+    io_group.add_argument("-o", "--output", default="output.vcf", help="Output VCF file")
+    io_group.add_argument("-l", "--bed",    default=None,     help="Optional BED file. If provided, --chroms will be ignored")
 
     processing = parser.add_argument_group('Processing options')
     processing.add_argument(
@@ -161,32 +125,14 @@ def main():
         choices=["speed", "performance"],
         help="Inference mode: speed (faster) or performance (more accurate)",
     )
-    processing.add_argument(
-        "--min_af",
-        type=float,
-        default=0.10,
-        help="Threshold of allele frequency at candidate variants",
-    )
-    processing.add_argument(
-        "--rd_floor",
-        type=int,
-        default=10,
-        help="Threshold of read depth at candidate variants",
-    )
-    processing.add_argument(
-        "--no_gpu",
-        action="store_false",
-        dest="use_gpu",
-        help="Disable GPU acceleration",
-    )
+    processing.add_argument("--min_af",   type=float, default=0.10, help="Threshold of allele frequency at candidate variants")
+    processing.add_argument("--rd_floor", type=int,   default=10,   help="Threshold of read depth at candidate variants")
 
     args = parser.parse_args()
 
-    # Resolve species default based on ploidy
     if args.species is None:
         args.species = PLOIDY_DEFAULT_SPECIES[args.ploidy]
 
-    # Unique working directory for intermediate files
     work_dir = os.path.join(os.getcwd(), f"DeepCaller_tem_dir_{uuid.uuid4().hex[:8]}")
     os.makedirs(work_dir, exist_ok=True)
 
@@ -242,10 +188,7 @@ def main():
         print("HARDWARE CONFIGURATION".center(80))
         print("=" * 80)
 
-        num_threads, gpu_available = check_hardware(
-            requested_cpus=args.cpus,
-            use_gpu=args.use_gpu,
-        )
+        num_threads = check_hardware(requested_cpus=args.cpus)
 
         print("[OK] Hardware configuration complete!")
 
@@ -348,18 +291,17 @@ def main():
     for chrom in chrom_list:
 
         process_args = [
-            "--ref",           args.ref,
-            "--bam",           os.path.join(work_dir, f"temp_{chrom}.bam"),
-            "--chrom",         chrom,
-            "--ploidy",        str(args.ploidy),
-            "--cpus",          str(num_threads),
-            "--bam_depth",     str(bam_depth),
-            "--species",       args.species,
-            "--mode",          args.mode,
-            "--min_af",       str(args.min_af),
-            "--rd_floor",      str(args.rd_floor),
-            "--gpu_available", str(gpu_available),
-            "--work_dir",      work_dir,
+            "--ref",       args.ref,
+            "--bam",       os.path.join(work_dir, f"temp_{chrom}.bam"),
+            "--chrom",     chrom,
+            "--ploidy",    str(args.ploidy),
+            "--cpus",      str(num_threads),
+            "--bam_depth", str(bam_depth),
+            "--species",   args.species,
+            "--mode",      args.mode,
+            "--min_af",    str(args.min_af),
+            "--rd_floor",  str(args.rd_floor),
+            "--work_dir",  work_dir,
         ]
 
         if args.bed is not None:

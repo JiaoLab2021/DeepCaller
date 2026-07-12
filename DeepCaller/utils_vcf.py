@@ -1,4 +1,5 @@
 import os
+import time
 import pysam
 import subprocess
 import numpy as np
@@ -91,6 +92,8 @@ def generate_vcf(ref_path, chrom_list, num_threads, vcf_file, ploidy, work_dir):
         # Write VCF header and records
         with open(vcf_file, "w") as f:
             f.write("##fileformat=VCFv4.2\n")
+            f.write("##source=DeepCaller\n")
+	        f.write("##fileDate=%s\n"%(time.strftime('%Y-%m-%d %H:%M:%S %w-%Z',time.localtime())))
             f.write("##FILTER=<ID=PASS,Description=\"All filters passed\">\n")
             f.write("##FILTER=<ID=RefCall,Description=\"Genotyping model thinks this site is reference.\">\n")
             f.write("##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")

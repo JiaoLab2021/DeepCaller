@@ -1,0 +1,5 @@
+__version__ = "1.0.0"
+__author__ = "Kang Xiao"
+__email__ = "xiaokangneuq@163.com"
+__license__ = "MIT"
+__description__ = "A deep learning-based variant caller for the detection of SNPs and small indels in tetraploid and hexaploid genomes from short-read sequencing data"

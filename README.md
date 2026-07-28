@@ -108,7 +108,7 @@ deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `-s`, `--species` | auto | Species model |
+| `-s`, `--species` | auto | Species model (See Supported Species) |
 | `-m`, `--mode` | `speed` | Inference mode: `speed` or `performance` |
 | `-t`, `--cpus` | `24` | CPU threads; use `-1` for all available |
 | `-d`, `--downsample` | off | Downsample each chromosome's BAM to a target depth (ploidy 4: 50X, ploidy 6: 80X) if the genome-wide depth exceeds it; chromosomes already below the target are left unchanged |

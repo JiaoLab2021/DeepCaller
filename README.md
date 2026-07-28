@@ -27,13 +27,13 @@ The DeepCaller workflow comprises four sequential steps. **Step 1:** After filte
 
 | `--species`   | Common name                | Ploidy | Training dataset | Default |
 |---------------|----------------------------|--------|------------------|---------|
-| `potato`      | Tetraploid potato          | 4x     | C88              | ✓ (ploidy 4) |
-| `alfalfa`     | Alfalfa                    | 4x     | Bolivia          | |
-| `rose`        | Modern rose                | 4x     | Samantha         | |
-| `sweetpotato` | Sweetpotato                | 6x     | Tanzania         | ✓ (ploidy 6) |
-| `syn_potato`  | Synthetic hexaploid potato | 6x     | SyntheticPotato  | |
+| `potato`      | Tetraploid potato          | Tetraploid     | C88              | ✓ (ploidy 4) |
+| `alfalfa`     | Alfalfa                    | Tetraploid     | Bolivia          | |
+| `rose`        | Modern rose                | Tetraploid     | Samantha         | |
+| `sweetpotato` | Sweetpotato                | Hexaploid      | Tanzania         | ✓ (ploidy 6) |
+| `syn_potato`  | Synthetic hexaploid potato | Hexaploid      | SyntheticPotato  | |
 
-> Users are encouraged to select the species model most similar to their target organism; if uncertain, the default models (`potato` for 4x, `sweetpotato` for 6x) are recommended.
+> Users are encouraged to select the species model most similar to their target organism; if uncertain, the default models (`potato` for tetraploid, `sweetpotato` for hexaploid) are recommended.
 
 ---
 
@@ -66,10 +66,10 @@ deepcaller --version
 
 ## 🚀 Quick Start
 
-A small demo dataset (chromosome 10, 1 Mb region; tetraploid potato C88 at ~20× coverage) is provided in the `Demo/` directory.
+A small demo dataset (chromosome 10, 1 Mb region; tetraploid potato C88) is provided in the `demo/` directory.
 
 ```bash
-cd Demo
+cd demo
 
 deepcaller \
     -r DM8.1_chr10_100000_1100000.fa \
@@ -111,10 +111,10 @@ deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 | `-s`, `--species` | auto | Species model |
 | `-m`, `--mode` | `speed` | Inference mode: `speed` or `performance` |
 | `-t`, `--cpus` | `24` | CPU threads; use `-1` for all available |
-| `--min_af` | `0.10` | Minimum allele frequency at candidate sites |
-| `--rd_floor` | `10` | Minimum read depth at candidate sites |
 | `-d`, `--downsample` | off | Downsample each chromosome's BAM to a target depth (ploidy 4: 50X, ploidy 6: 80X) if the genome-wide depth exceeds it; chromosomes already below the target are left unchanged |
 | `--seed` | `42` | Random seed used for `samtools view -s` downsampling |
+| `--min_af` | `0.10` | Minimum allele frequency at candidate sites |
+| `--rd_floor` | `10` | Minimum read depth at candidate sites |
 
 ### Example commands
 

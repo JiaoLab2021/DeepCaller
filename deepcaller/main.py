@@ -134,8 +134,7 @@ def main():
         choices=["speed", "performance"],
         help="Inference mode: speed (faster) or performance (more accurate)",
     )
-    processing.add_argument("--min_af",   type=float, default=0.10, help="Threshold of allele frequency at candidate variants")
-    processing.add_argument("--rd_floor", type=int,   default=10,   help="Threshold of read depth at candidate variants")
+    
     processing.add_argument(
         "-d", "--downsample",
         action="store_true",
@@ -146,7 +145,9 @@ def main():
         ),
     )
     processing.add_argument("--seed", type=int, default=42, help="Random seed used for samtools view -s downsampling")
-
+    processing.add_argument("--min_af",   type=float, default=0.10, help="Threshold of allele frequency at candidate variants")
+    processing.add_argument("--rd_floor", type=int,   default=10,   help="Threshold of read depth at candidate variants")
+    
     args = parser.parse_args()
 
     if args.species is None:

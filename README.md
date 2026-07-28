@@ -27,10 +27,10 @@ The DeepCaller workflow comprises four sequential steps. **Step 1:** After filte
 
 | `--species`   | Common name                | Ploidy | Training dataset | Default |
 |---------------|----------------------------|--------|------------------|---------|
-| `potato`      | Tetraploid potato          | Tetraploid     | C88              | ✓ (ploidy 4) |
+| `potato`      | Tetraploid potato          | Tetraploid     | C88              | ✓ (Tetraploid) |
 | `alfalfa`     | Alfalfa                    | Tetraploid     | Bolivia          | |
 | `rose`        | Modern rose                | Tetraploid     | Samantha         | |
-| `sweetpotato` | Sweetpotato                | Hexaploid      | Tanzania         | ✓ (ploidy 6) |
+| `sweetpotato` | Sweetpotato                | Hexaploid      | Tanzania         | ✓ (Hexaploid)  |
 | `syn_potato`  | Synthetic hexaploid potato | Hexaploid      | SyntheticPotato  | |
 
 > Users are encouraged to select the species model most similar to their target organism; if uncertain, the default models (`potato` for tetraploid, `sweetpotato` for hexaploid) are recommended.
@@ -143,7 +143,7 @@ DeepCaller produces a bgzip-compressed, tabix-indexed VCF file (`<output>.gz` an
 | Field | Description |
 |-------|-------------|
 | `GT`  | Polyploid genotype (e.g. `0/0/0/1` for tetraploid simplex) |
-| `GQ`  | Genotype quality (Phred-scaled) |
+| `GQ`  | Genotype quality |
 | `DP`  | Read depth at the site |
 | `AD`  | Allelic depth (ref, alt) |
 | `AF`  | Allele frequency |

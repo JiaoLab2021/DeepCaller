@@ -1,4 +1,4 @@
-name: DeepCaller_env
+name: deepcaller
 channels:
   - conda-forge
   - bioconda

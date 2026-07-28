@@ -111,7 +111,7 @@ deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 | `-s`, `--species` | auto | Species model (See Supported Species) |
 | `-m`, `--mode` | `speed` | Inference mode: `speed` or `performance` |
 | `-t`, `--cpus` | `24` | CPU threads; use `-1` for all available |
-| `-d`, `--downsample` | off | Downsample BAM to a target depth (tetraploid: 50X, hexaploid: 80X) if the genome-wide depth exceeds it |
+| `-d`, `--downsample` | off | Downsample BAM to a target depth (tetraploid: 50X, hexaploid: 80X) if the sequencing depth exceeds it |
 | `--seed` | `42` | Random seed used for `samtools view -s` downsampling |
 | `--min_af` | `0.10` | Minimum allele frequency at candidate sites |
 | `--rd_floor` | `10` | Minimum read depth at candidate sites |

@@ -1,15 +1,15 @@
 # DeepCaller
 
 <p align="left"> 
-  <img src="https://img.shields.io/badge/版本-1.0.0-blue" alt="版本">
+  <img src="https://img.shields.io/badge/版本-1.0.1-blue" alt="版本">
   <img src="https://img.shields.io/badge/许可证-MIT-green" alt="许可证">
   <img src="https://img.shields.io/badge/python-3.9-blue" alt="Python">
   <img src="https://img.shields.io/badge/平台-linux-lightgrey" alt="平台">
 </p>
 
-**DeepCaller** 是一款基于深度学习的变异检测工具，专为多倍体基因组短读长数据中 SNP 和小片段 Indel 的精准检测而设计。它提供了五个针对四倍体和六倍体作物的预训练模型，并支持速度优先和性能优先两种推理模式。英文教程请参见 [English README](../README.md)。
+**DeepCaller** 是一款基于深度学习的变异检测工具，用于从短读长数据中精准检测多倍体基因组的 SNP 和小片段 Indel。它提供五个针对四倍体和六倍体作物的预训练模型，推理阶段可在普通 CPU 上运行。英文教程请参见 [English README](../README.md)。
 
-> **注意**：本仓库配套论文目前正在审稿中，软件的完整使用权将在论文正式发表后开放。详情请参见 [LICENSE](../LICENSE)。
+> **注意**：本仓库配套论文正在审稿中，软件的完整使用权将在论文正式发表后开放。详情请参见 [LICENSE](../LICENSE)。
 
 ---
 
@@ -19,21 +19,22 @@
   <img src="flow.png" alt="DeepCaller 工作流程" width="800">
 </p>
 
-DeepCaller 的工作流程包含四个顺序步骤。**步骤一：** 对输入 BAM 文件进行过滤后，DeepCaller 逐位点分析比对数据，基于最小等位基因频率和测序深度的双重阈值筛选候选变异位点。**步骤二：** 将每个候选位点双链及其侧翼碱基编码为结构化的堆积张量（pileup tensor）。**步骤三：** 将张量输入由两层双向 LSTM（Bi-LSTM）和三层 ReLU 激活全连接层组成的循环神经网络（RNN），按倍性特定类别预测基因型（四倍体五类，六倍体七类）。**步骤四：** 根据预测基因型和比对数据生成 VCF 文件。
+DeepCaller 的工作流程包含四个顺序步骤。**步骤一，候选发现：** 对输入 BAM 文件进行过滤后，逐位点扫描，基于替代等位基因频率与测序深度的双重阈值筛选候选变异位点。**步骤二，读段分组：** 将覆盖每个候选位点的读段按其支持的替代等位基因分组，分组数不超过样本倍性。**步骤三，特征编码：** 将每个等位基因分组的堆积（pileup）连同其侧翼位点编码为形状为 (2*w* + 1) × 15 的结构化张量。**步骤四，剂量预测：** 由权重共享的 LSTM 汇总每个分组，跨组自注意力在各组间交换上下文信息，解码器在硬性倍性预算约束下自回归地预测每个候选等位基因的拷贝数，并据此生成 VCF 文件。
 
 ---
 
+<a id="支持物种"></a>
 ## 🌿 支持物种
 
-| `--species`   | 常用名称           | 倍性   | 训练数据集       | 默认 |
-|---------------|--------------------|--------|------------------|------|
-| `potato`      | 四倍体马铃薯       | 四倍体 | C88              | ✓（四倍体） |
-| `alfalfa`     | 苜蓿               | 四倍体 | Bolivia          | |
-| `rose`        | 现代月季           | 四倍体 | Samantha         | |
-| `sweetpotato` | 甘薯               | 六倍体 | Tanzania         | ✓（六倍体） |
-| `syn_potato`  | 合成六倍体马铃薯   | 六倍体 | SyntheticPotato  | |
+| `--species`             | 常用名称           | 倍性   | 训练数据集       | 默认         |
+|-------------------------|--------------------|--------|------------------|--------------|
+| `C88_Potato`            | 四倍体马铃薯       | 四倍体 | C88              | ✓（四倍体）  |
+| `Bolivia_Alfalfa`       | 苜蓿               | 四倍体 | Bolivia          | |
+| `Samantha_Rose`         | 现代月季           | 四倍体 | Samantha         | |
+| `SyntheticPotato_Potato`| 合成六倍体马铃薯   | 六倍体 | 合成六倍体       | ✓（六倍体）  |
+| `Tanzania_Sweetpotato`  | 甘薯               | 六倍体 | Tanzania         | |
 
-> 建议用户选择与目标物种最相近的物种模型；若不确定，推荐使用默认模型（四倍体默认使用 `potato`，六倍体默认使用 `sweetpotato`）。
+> 若不指定 `--species`，DeepCaller 将按倍性使用默认模型（四倍体为 `C88_Potato`，六倍体为 `SyntheticPotato_Potato`）。默认模型跨物种泛化良好，对没有专用模型的基因组是稳妥选择；当在意几个百分点的精度差异时，建议在一小段区域上比较各候选模型后再定。
 
 ---
 
@@ -75,17 +76,14 @@ deepcaller \
     -r DM8.1_chr10_100000_1100000.fa \
     -b C88_20x_chr10_100000_1100000.bam \
     -p 4 \
-    --mode speed \
     -o demo_output.vcf
 ```
 
 ---
 
 ## 📖 使用说明
-
-```
 deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
-```
+
 
 ### 必需参数
 
@@ -99,37 +97,41 @@ deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `-o`, `--output` | `output.vcf` | 输出 VCF 文件（将进行 bgzip 压缩） |
+| `-o`, `--out` | `output.vcf` | 输出 VCF 文件（bgzip 压缩并建立 tabix 索引） |
 | `-c`, `--chroms` | 全部 | 指定处理的染色体 |
-| `--bed` | — | BED 文件，将变异检测限定于目标区域；设置后覆盖 `--chroms` |
-| `-S`, `--sample` | `SAMPLE` | 显示在 VCF `#CHROM` 列头行中的样本名/ID |
+| `-l`, `--bed` | — | BED 文件，将变异检测限定于目标区域；设置后忽略 `--chroms` |
+| `--sample` | `SAMPLE` | 写入 VCF `#CHROM` 表头行的样本名/ID |
+| `--work_dir` | 自动 | 临时目录；默认在工作目录下新建唯一目录，成功后自动删除 |
+| `--keep_tmp` | 关闭 | 保留临时目录以便调试 |
 
 ### 处理选项
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `-s`, `--species` | auto | 物种模型（参见"支持物种"） |
-| `-m`, `--mode` | `speed` | 推理模式：`speed`（速度优先）或 `performance`（性能优先） |
+| `--species` | 随倍性而定 | 物种模型（参见[支持物种](#支持物种)）；`-p 4` 默认 `C88_Potato`，`-p 6` 默认 `SyntheticPotato_Potato` |
 | `-t`, `--cpus` | `24` | CPU 线程数；`-1` 表示使用全部可用线程 |
-| `-d`, `--downsample` | 关闭 | 若测序深度超过目标深度（四倍体：50X，六倍体：80X），将 BAM 下采样至目标深度 |
+| `--downsample` | 关闭 | 当全基因组深度超过目标深度（四倍体 50×，六倍体 80×）时，将 BAM 下采样至目标深度 |
 | `--seed` | `42` | 用于 `samtools view -s` 下采样的随机种子 |
-| `--min_af` | `0.10` | 候选位点最小等位基因频率 |
-| `--rd_floor` | `10` | 候选位点最小测序深度 |
+| `-v`, `--min_af` | `0.1` | 候选等位基因的最小替代等位基因频率 |
+| `-d`, `--rd_floor` | `8` | 候选位点的最小测序深度 |
+| `--min_mq` | `5` | 堆积时保留读段的最小比对质量 |
+| `--max_id_len` | `50` | 作为候选等位基因的最大 indel 长度 |
+| `--batch_size` | `8192` | 模型推理批大小 |
 
 ### 示例命令
 
 ```bash
-# 四倍体马铃薯，全基因组，性能优先模式
-deepcaller -r ref.fa -b sample.bam -p 4 --mode performance -o out.vcf -t 24
+# 四倍体马铃薯，全基因组，24 线程
+deepcaller -r ref.fa -b sample.bam -p 4 -o out.vcf -t 24
 
-# 六倍体甘薯，指定染色体
-deepcaller -r ref.fa -b sample.bam -p 6 -c chr1 chr2 chr3 -o out.vcf
+# 六倍体甘薯模型，指定染色体
+deepcaller -r ref.fa -b sample.bam -p 6 --species Tanzania_Sweetpotato -c chr1 chr2 chr3 -o out.vcf
 
 # 苜蓿，仅分析目标区域（BED 文件）
-deepcaller -r ref.fa -b sample.bam -p 4 --species alfalfa --bed targets.bed -o out.vcf
+deepcaller -r ref.fa -b sample.bam -p 4 --species Bolivia_Alfalfa -l targets.bed -o out.vcf
 
-# 自定义样本名，对高深度染色体先下采样再检测变异
-deepcaller -r ref.fa -b sample.bam -p 4 -S MySample -d -o out.vcf
+# 自定义样本名；对高深度数据先下采样再检测变异
+deepcaller -r ref.fa -b sample.bam -p 4 --sample MySample --downsample -o out.vcf
 ```
 
 ---
@@ -142,10 +144,10 @@ DeepCaller 输出经 bgzip 压缩并建立 tabix 索引的 VCF 文件（`<output
 
 | 字段 | 说明 |
 |------|------|
-| `GT` | 多倍体基因型（如四倍体单体型 `0/0/0/1`） |
+| `GT` | 多倍体基因型（如四倍体单拷贝位点 `0/0/0/1`） |
 | `GQ` | 基因型质量值 |
 | `DP` | 该位点测序深度 |
-| `AD` | 各等位基因深度（参考基因/替代基因） |
+| `AD` | 各等位基因深度（参考，替代） |
 | `AF` | 等位基因频率 |
 
 ---

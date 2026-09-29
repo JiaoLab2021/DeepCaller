@@ -81,9 +81,10 @@ deepcaller \
 
 ---
 
+```bash
 ## 📖 使用说明
 deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
-
+```
 
 ### 必需参数
 

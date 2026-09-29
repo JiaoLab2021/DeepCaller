@@ -83,8 +83,10 @@ deepcaller \
 ---
 
 ## 📖 Usage
-deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 
+```bash
+deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
+```
 
 ### Required arguments
 

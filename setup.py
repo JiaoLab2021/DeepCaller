@@ -1,15 +1,15 @@
 from setuptools import setup, find_packages
-from deepcaller import __version__, __author__, __email__, __license__, __description__
+from deepcaller import __version__
 
 setup(
     name="DeepCaller",
     version=__version__,
-    author=__author__,
-    author_email=__email__,
-    description=__description__,
+    author="Kang Xiao",
+    author_email="xiaokangneuq@163.com",
+    description="small-variant discovery and genotyping for polyploid genomes",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    license=__license__,
+    license="MIT",
     url="https://github.com/JiaoLab2021/DeepCaller",
     packages=find_packages(),
     python_requires=">=3.9",

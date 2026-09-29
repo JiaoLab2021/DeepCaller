@@ -19,22 +19,23 @@
   <img src="docs/flow.png" alt="DeepCaller Workflow" width="800">
 </p>
 
-The DeepCaller workflow comprises four sequential steps. **Step 1:** After filtering the input BAM file, DeepCaller performs per-site analysis and selects candidate variant sites based on dual thresholds on minor allele frequency and read depth. **Step 2:** Both strands of each candidate site, along with flanking bases, are encoded into a structured pileup tensor. **Step 3:** Tensors are fed into a recurrent neural network (RNN) comprising two bidirectional LSTM (Bi-LSTM) layers followed by three feedforward layers with ReLU activations, predicting genotypes across ploidy-specific categories (five for tetraploids, seven for hexaploids). **Step 4:** DeepCaller generates a VCF file from the predicted genotypes and alignment data.
+The DeepCaller workflow comprises four sequential steps. **Step 1 — Allele discovery:** after filtering the input BAM file, DeepCaller scans each position and selects candidate variant sites using dual thresholds on alternate-allele frequency and read depth. **Step 2 — Read grouping:** the reads overlapping each candidate site are grouped by the alternate allele they support, up to the sample's ploidy. **Step 3 — Feature encoding:** the pileup of each allele-specific group, together with its flanking positions, is encoded into a structured tensor of shape (2*w* + 1) × 15. **Step 4 — Dosage prediction:** a weight-shared LSTM summarizes each group, cross-group self-attention exchanges context between groups, and a decoder assigns the copy number of each candidate allele autoregressively under a hard ploidy budget, from which the VCF is written.
 
 ---
 
 <a id="supported-species"></a>
 ## 🌿 Supported Species
 
-| `--species`   | Common name                | Ploidy | Training dataset | Default |
-|---------------|----------------------------|--------|------------------|---------|
-| `potato`      | Tetraploid potato          | Tetraploid     | C88              | ✓ (Tetraploid) |
-| `alfalfa`     | Alfalfa                    | Tetraploid     | Bolivia          | |
-| `rose`        | Modern rose                | Tetraploid     | Samantha         | |
-| `sweetpotato` | Sweetpotato                | Hexaploid      | Tanzania         | ✓ (Hexaploid)  |
-| `syn_potato`  | Synthetic hexaploid potato | Hexaploid      | SyntheticPotato  | |
 
-> Users are encouraged to select the species model most similar to their target organism; if uncertain, the default models (`potato` for tetraploid, `sweetpotato` for hexaploid) are recommended.
+| `--species`             | Common name                | Ploidy     | Training dataset  | Default        |
+|-------------------------|----------------------------|------------|-------------------|----------------|
+| `C88_Potato`            | Tetraploid potato          | Tetraploid | C88               | ✓ (tetraploid) |
+| `Bolivia_Alfalfa`       | Alfalfa                    | Tetraploid | Bolivia           | |
+| `Samantha_Rose`         | Modern rose                | Tetraploid | Samantha          | |
+| `SyntheticPotato_Potato`| Synthetic hexaploid potato | Hexaploid  | Synthetic hexaploid | ✓ (hexaploid) |
+| `Tanzania_Sweetpotato`  | Sweetpotato                | Hexaploid  | Tanzania          | |
+
+> If `--species` is omitted, DeepCaller uses the default model for the given ploidy (`C88_Potato` for tetraploids, `SyntheticPotato_Potato` for hexaploids). The default models generalize well across species, so they are a safe choice for genomes without a dedicated model; where a few points of accuracy matter, comparing the candidate models on a small region is worthwhile.
 
 ---
 
@@ -76,17 +77,14 @@ deepcaller \
     -r DM8.1_chr10_100000_1100000.fa \
     -b C88_20x_chr10_100000_1100000.bam \
     -p 4 \
-    --mode speed \
     -o demo_output.vcf
 ```
 
 ---
 
 ## 📖 Usage
-
-```
 deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
-```
+
 
 ### Required arguments
 
@@ -100,37 +98,41 @@ deepcaller -r <REF> -b <BAM> -p <PLOIDY> [options]
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `-o`, `--output` | `output.vcf` | Output VCF file (will be bgzip-compressed) |
+| `-o`, `--out` | `output.vcf` | Output VCF file (bgzip-compressed and tabix-indexed) |
 | `-c`, `--chroms` | all | Chromosomes to process |
-| `--bed` | — | BED file restricting variant calling to target regions; overrides `--chroms` |
-| `-S`, `--sample` | `SAMPLE` | Sample name/id shown in the VCF `#CHROM` column line |
+| `-l`, `--bed` | — | BED file restricting calling to target regions; if provided, `--chroms` is ignored |
+| `--sample` | `SAMPLE` | Sample name written to the VCF `#CHROM` header line |
+| `--work_dir` | auto | Temporary directory; a unique directory is created under the working directory and removed on success |
+| `--keep_tmp` | off | Keep the temporary directory for debugging |
 
 ### Processing options
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `-s`, `--species` | auto | Species model (See [Supported Species](#supported-species)) |
-| `-m`, `--mode` | `speed` | Inference mode: `speed` or `performance` |
+| `--species` | ploidy-dependent | Species model (see [Supported Species](#supported-species)); default is `C88_Potato` for `-p 4` and `SyntheticPotato_Potato` for `-p 6` |
 | `-t`, `--cpus` | `24` | CPU threads; use `-1` for all available |
-| `-d`, `--downsample` | off | Downsample BAM to a target depth (tetraploid: 50X, hexaploid: 80X) if the sequencing depth exceeds it |
-| `--seed` | `42` | Random seed used for `samtools view -s` downsampling |
-| `--min_af` | `0.10` | Minimum allele frequency at candidate sites |
-| `--rd_floor` | `10` | Minimum read depth at candidate sites |
+| `--downsample` | off | Downsample the BAM to a target depth (50× for `-p 4`, 80× for `-p 6`) when the genome-wide depth exceeds it |
+| `--seed` | `42` | Random seed used by `samtools view -s` for downsampling |
+| `-v`, `--min_af` | `0.1` | Minimum alternate-allele fraction of a candidate allele |
+| `-d`, `--rd_floor` | `8` | Minimum read depth of a candidate locus |
+| `--min_mq` | `5` | Minimum mapping quality kept during pileup |
+| `--max_id_len` | `50` | Maximum indel length considered as a candidate allele |
+| `--batch_size` | `8192` | Model inference batch size |
 
 ### Example commands
 
 ```bash
-# Tetraploid potato, whole genome, performance mode
-deepcaller -r ref.fa -b sample.bam -p 4 --mode performance -o out.vcf -t 24
+# Tetraploid potato, whole genome, 24 threads
+deepcaller -r ref.fa -b sample.bam -p 4 -o out.vcf -t 24
 
-# Hexaploid sweetpotato, specific chromosomes
-deepcaller -r ref.fa -b sample.bam -p 6 -c chr1 chr2 chr3 -o out.vcf
+# Hexaploid sweetpotato model, specific chromosomes
+deepcaller -r ref.fa -b sample.bam -p 6 --species Tanzania_Sweetpotato -c chr1 chr2 chr3 -o out.vcf
 
 # Alfalfa, target regions only (BED file)
-deepcaller -r ref.fa -b sample.bam -p 4 --species alfalfa --bed targets.bed -o out.vcf
+deepcaller -r ref.fa -b sample.bam -p 4 --species Bolivia_Alfalfa -l targets.bed -o out.vcf
 
-# Custom sample name, downsample high-depth chromosomes before calling
-deepcaller -r ref.fa -b sample.bam -p 4 -S MySample -d -o out.vcf
+# Custom sample name; downsample high-depth data before calling
+deepcaller -r ref.fa -b sample.bam -p 4 --sample MySample --downsample -o out.vcf
 ```
 
 ---
@@ -143,10 +145,10 @@ DeepCaller produces a bgzip-compressed, tabix-indexed VCF file (`<output>.gz` an
 
 | Field | Description |
 |-------|-------------|
-| `GT`  | Polyploid genotype (e.g. `0/0/0/1` for tetraploid simplex) |
+| `GT`  | Polyploid genotype (e.g. `0/0/0/1` for a tetraploid simplex site) |
 | `GQ`  | Genotype quality |
 | `DP`  | Read depth at the site |
-| `AD`  | Allelic depth (ref, alt) |
+| `AD`  | Allelic depths (reference, alternate) |
 | `AF`  | Allele frequency |
 
 ---

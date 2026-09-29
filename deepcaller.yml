@@ -12,8 +12,8 @@ dependencies:
   - wheel
 
   # ---------- bioinformatics tools ----------
-  - samtools=1.6
-  - htslib=1.9
+  - samtools>=1.6
+  - htslib>=1.9
   - mosdepth=0.3.3
   - bedtools=2.26.0
   - bedops=2.4.42
@@ -32,24 +32,23 @@ dependencies:
   # ---------- pip packages ----------
   - pip:
       # core scientific
-      - numpy==1.23.0
+      - numpy==1.24.4
       - pandas==2.2.3
-      - h5py==3.12.1
+      - h5py==3.11.0
 
       # BAM / VCF
       - pysam==0.22.1
-      - pyarrow==20.0.0
+      - pyarrow==14.0.2
       
       # deep learning
       - tensorflow==2.8.0
       - keras==2.8.0
-      - tensorflow-addons==0.16.1
 
       # tensorflow hard deps
       - absl-py==2.1.0
       - gast==0.6.0
       - opt-einsum==3.4.0
-      - protobuf==3.20.0
+      - protobuf==3.20.3
       - six==1.16.0
       - wrapt==1.16.0
       - termcolor==2.5.0

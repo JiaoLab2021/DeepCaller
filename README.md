@@ -16,7 +16,7 @@
 ## 🏛️ Background
 
 <p align="center">
-  <img src="docs/flow.png" alt="DeepCaller Workflow" width="800">
+  <img src="docs/flow1.png" alt="DeepCaller Workflow" width="800">
 </p>
 
 The DeepCaller workflow comprises four sequential steps. **Step 1 — Allele discovery:** after filtering the input BAM file, DeepCaller scans each position and selects candidate variant sites using dual thresholds on alternate-allele frequency and read depth. **Step 2 — Read grouping:** the reads overlapping each candidate site are grouped by the alternate allele they support, up to the sample's ploidy. **Step 3 — Feature encoding:** the pileup of each allele-specific group, together with its flanking positions, is encoded into a structured tensor of shape (2*w* + 1) × 15. **Step 4 — Dosage prediction:** a weight-shared LSTM summarizes each group, cross-group self-attention exchanges context between groups, and a decoder assigns the copy number of each candidate allele autoregressively under a hard ploidy budget, from which the VCF is written.
